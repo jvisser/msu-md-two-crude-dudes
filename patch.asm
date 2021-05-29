@@ -1,5 +1,3 @@
-; DISCLAIMER: The new code is made to fit within the original ROM without expanding it (personal goal). Making it a bit less easy to read/port probably.
-
 ; Mega CD MMIO addresses used for communicating with msu-md driver on the mega cd (mode 1)
 MSU_COMM_CMD        equ $a12010                 ; Comm command 0 (high byte)
 MSU_COMM_ARG        equ $a12011                 ; Comm command 0 (low byte)
@@ -19,10 +17,6 @@ Z80_BUS_REQUEST     equ $a11100
 
 ; Where to put the code
 ROM_END             equ $ff814
-
-; CONFIG: ------------------------------------------------------------------------------------------
-
-ORIGINAL_INTRO = 0
 
 ; MACROS: ------------------------------------------------------------------------------------------
 
@@ -47,88 +41,38 @@ ORIGINAL_INTRO = 0
         org     $338                            ; Original ENTRY POINT
 Game
 
-        ; play_music_track (50 bytes available)
+        ; music_driver_play_track (50 bytes available)
         org     $6ac
-play_music_track                                ; d0 = track id
-        lea     MSU_COMM_CMD,a0
-    if (ORIGINAL_INTRO)
-        tst.b   d0
-        bne.s   .play_cd_track
-            bsr     pause_cd
-            exg     d0,d7
-            bra.s   alt_play_music_track
-.play_cd_track
-    endif
-.msu_wait
-            tst.b   $10(a0)
-        bne.s   .msu_wait
-
-        ; Load and send msu command
+music_driver_play_track                         ; d0 = track id
+        MSU_WAIT
         lea     AUDIO_TBL.l,a1
         ext.w   d0
         add.w   d0,d0
         move.w  (a1,d0),d0
-        move.w  d0,(a0)                         ; Send msu cmd
-        addq.b  #1,$f(a0)                       ; Increment command clock
-
-        ; Send stop command for original music
-        moveq   #3,d0
-        bra     original_music_driver_command_73c
-        ; 50 bytes total
-
-        org     $6de
-alt_play_music_track                            ; d7 = track id
+        move.w  d0,MSU_COMM_CMD                 ; Send msu cmd
+        addq.b  #1,MSU_COMM_CMD_CK              ; Increment command clock
+        rts
+        ; 36 bytes total
 
         ; music_driver_command (42 bytes available)
-        ; 1 = ?
-        ; 2 = start track (needs track id see play_music_track)
+        ; 1 = fade out
+        ; 2 = start track (needs track id see music_driver_play_track)
         ; 3 = stop play
         ; 4 = pause
         ; 5 = resume
         org     $73c
-music_driver_command
-        lea     MSU_COMM_CMD,a0
-.msu_wait
-            tst.b   $10(a0)
-        bne.s   .msu_wait
-
-        ; Stop/pause command
-        btst    d0,#$18
-        beq.s   .no_stop
-            bsr     pause_cd
-.no_stop
-        ; Resume command
-        cmpi.b  #5,d0
-        bne.s   .no_resume
-            bsr     resume_cd
-.no_resume
-        ; Run original code
-        bra     original_music_driver_command_73c
-        ; 36 bytes total
-
-        ; Use the reserved/unused 68000 vector space (60 bytes available)
-        org $0c
-pause_cd
-        move.w  #MSU_PAUSE,(a0)                 ; Send msu cmd
-        addq.b  #1,$f(a0)                       ; Increment command clock
+music_driver_command                            ; d0 = command
+        MSU_WAIT
+        move.w  d0,d1
+        ext.w   d1
+        subq.w  #1,d1
+        add.w   d1,d1
+        lea     DRIVER_CMD_TBL,a1
+        move.w  (a1,d1),d1
+        move.w  d1,MSU_COMM_CMD                 ; Send msu cmd
+        addq.b  #1,MSU_COMM_CMD_CK              ; Increment command clock
         rts
-
-resume_cd
-        move.w  #MSU_RESUME,(a0)                ; Send msu cmd
-        addq.b  #1,$f(a0)                       ; Increment command clock
-        rts
-
-original_music_driver_command_73c
-        ori     #$0700,sr
-        move.w  #$0100,Z80_BUS_REQUEST
-.z80_bus_req_wait
-            btst    #0,Z80_BUS_REQUEST
-        bne     .z80_bus_req_wait
-        move.b  d0,$a00108
-        clr.w   Z80_BUS_REQUEST
-        andi    #~$0700,sr
-        rts
-    ; 60 bytes total
+        ; 40 bytes total
 
 ; MSU-MD Init: -------------------------------------------------------------------------------------
 
@@ -173,6 +117,13 @@ AUDIO_TBL                                       ; #Track Name
         dc.w    MSU_PLAY_LOOP|08                ; 08 - The Wild Desire (BGM 4)
         dc.w    MSU_PLAY|09                     ; 09 - Justice has Won (Ending)
         dc.w    MSU_PLAY|10                     ; 10 - The Crude is Down (Game Over)
+
+DRIVER_CMD_TBL
+        dc.w    MSU_PAUSE|(75*3)
+        dc.w    MSU_RESUME
+        dc.w    MSU_PAUSE
+        dc.w    MSU_PAUSE
+        dc.w    MSU_RESUME
 
 ; MSU-MD DRIVER: -----------------------------------------------------------------------------------
 
