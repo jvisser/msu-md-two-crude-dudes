@@ -119,7 +119,7 @@ AUDIO_TBL                                       ; #Track Name
         dc.w    MSU_PLAY|10                     ; 10 - The Crude is Down (Game Over)
 
 DRIVER_CMD_TBL
-        dc.w    MSU_PAUSE|(75*3)
+        dc.w    MSU_PAUSE|(75*2)
         dc.w    MSU_RESUME
         dc.w    MSU_PAUSE
         dc.w    MSU_PAUSE
