@@ -68,11 +68,10 @@ music_driver_command                            ; d0 = command
         subq.w  #1,d1
         add.w   d1,d1
         lea     DRIVER_CMD_TBL,a1
-        move.w  (a1,d1),d1
-        move.w  d1,MSU_COMM_CMD                 ; Send msu cmd
+        move.w  (a1,d1),MSU_COMM_CMD            ; Send msu cmd
         addq.b  #1,MSU_COMM_CMD_CK              ; Increment command clock
         rts
-        ; 40 bytes total
+        ; 38 bytes total
 
 ; MSU-MD Init: -------------------------------------------------------------------------------------
 
